@@ -160,8 +160,9 @@ local (`http://192.168.50.63/`).
 
 - **Le joker `*` de `neuvytech.fr` (IONOS) couvre déjà `volvelo.neuvytech.fr`** : aucune
   création d'enregistrement A n'est nécessaire pour que le nom résolve. Il pointe vers
-  l'IP publique de la box (`82.65.196.90`), où nginx répond sur 80 (redirection 301) et
-  sert **Home Assistant** sur 443. Le nom résout donc, mais vers le mauvais service :
+  l'IP publique de la box (celle que renvoie déjà le domaine racine), où nginx répond sur
+  80 (redirection 301) et sert un autre service sur 443. Le nom résout donc, mais vers le
+  mauvais service :
   tant que la VM de production n'est pas exposée (forward DNS sur la box, certificat,
   `ServerAlias` déjà en place), `https://volvelo.neuvytech.fr` atterrit sur Home Assistant.
 - **Sur le réseau local, ce joker est invisible** : le NAS Synology est **autoritaire**
