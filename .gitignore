@@ -20,6 +20,9 @@
 # production
 /build
 
+# paquets déployables générés par deploy/build-standalone.sh
+/dist
+
 # misc
 .DS_Store
 *.pem

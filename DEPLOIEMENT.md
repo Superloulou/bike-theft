@@ -31,6 +31,21 @@ arrière. La maquette n'enregistre aucune donnée : redéployer ne risque aucune
 Contraintes mesurées sur la VM 210 : disque racine 2,8 Go (1,4 Go libres), 967 Mo de RAM,
 aucun swap, Apache déjà actif sur le port 80, aucun service Node.js.
 
+### État de la recette (déployé)
+
+| Élément | Valeur relevée sur la VM |
+| --- | --- |
+| Service | `velosignale.service`, `active`, `enabled` (démarré au boot), `Restart=always` |
+| Écoute | `0.0.0.0:3100` — le port 80 d'Apache n'est pas touché |
+| Node.js | v22.14.0 installé dans `/usr/local` (115 Mo) |
+| Application | `/opt/velosignale/current` → `releases/velosignale-<horodatage>` (76 Mo pour deux versions) |
+| Utilisateur | `velosignale` (système, sans shell de connexion) |
+| Données | `/opt/velosignale/data` — vide, la maquette n'écrit rien |
+| Mémoire du service | ~40 Mo |
+| Redémarrage automatique | vérifié : le processus tué est réapprovisionné par systemd en quelques secondes et le test de santé repasse à 200 |
+
+Accès de vérification : `http://192.168.50.60:3100/`.
+
 ## 3. Déroulé d'une mise à jour
 
 ```bash
