@@ -26,10 +26,33 @@ arrière. La maquette n'enregistre aucune donnée : redéployer ne risque aucune
 | VM | Rôle | Accès |
 | --- | --- | --- |
 | 210 | recette | `muret@192.168.50.60` (hôte `muret-recette`), Debian 13, `sudo` sans mot de passe |
-| 211 | production | à confirmer auprès de l'exploitant avant toute installation |
+| 211 | production | **n'existe pas sur le cluster** — voir l'inventaire ci-dessous |
 
 Contraintes mesurées sur la VM 210 : disque racine 2,8 Go (1,4 Go libres), 967 Mo de RAM,
 aucun swap, Apache déjà actif sur le port 80, aucun service Node.js.
+
+### Inventaire réel du cluster (relevé via l'API Proxmox du nœud `proxmox2`, PVE 9.2.2)
+
+Le numéro de machine attendu ne correspond pas au VMID réel : la machine de recette déclarée
+« VM 210 » est en réalité le **VMID 101**. Aucun VMID 211 n'est présent, et l'API renvoie
+`211` comme identifiant **libre** (`cluster/nextid`), ce qui confirme qu'aucune machine de
+production n'a encore été créée.
+
+| VMID | Nom | IP | Rôle constaté |
+| --- | --- | --- | --- |
+| 100 | `villarceau` | `192.168.50.50` | site « Projet remplacement du muret de Villarceau » |
+| 101 | `muret-recette` | `192.168.50.60` | **recette Vélo Signalé** (déploiement en cours) |
+| 200 | `tor-gateway` | `192.168.50.61` | passerelle Tor — ne pas toucher |
+| 201 | `lbc-alertes` | `192.168.50.62` | alertes Leboncoin — ne pas toucher |
+
+Autres hôtes joignables sur le réseau qui ne sont **pas** des VM du cluster : `192.168.50.56`
+(Home Assistant), `192.168.50.55` et `192.168.50.57` (SSH ouvert, aucune identité connue),
+`192.168.50.58` (le nœud Proxmox lui-même).
+
+Conséquence : la production ne peut pas être déployée tant que la machine n'existe pas. Deux
+options, à trancher par l'exploitant — créer la VM 211 (le token d'automatisation dispose des
+droits `VM.Allocate`/`VM.Clone`), ou désigner une VM existante. Le déploiement n'est pas
+lancé à l'aveugle.
 
 ### État de la recette (déployé)
 
@@ -116,15 +139,21 @@ projet** : elles nécessitent une validation explicite.
 
 ## 8. Passer en production (VM 211)
 
-Uniquement après validation de la recette :
+**Aucune VM de production n'existe à ce jour** (voir l'inventaire de la section 2 : le VMID 211
+est libre, les seules machines du cluster sont les VMID 100, 101, 200 et 201). Cette étape est
+donc en attente, et elle n'est pas exécutée sans accord explicite de l'exploitant.
+
+Une fois la machine cible créée (ou une VM existante désignée), le script de recette sert tel
+quel, il suffit de changer la cible :
 
 ```bash
-VM_HOST=<ip-de-la-vm-211> VM_USER=<utilisateur> bash deploy/deploy-vm210.sh
+VM_HOST=<ip-de-la-vm-de-production> VM_USER=<utilisateur> bash deploy/deploy-vm210.sh
 ```
 
-Préalables à vérifier sur la VM 211 avant d'écrire quoi que ce soit : accessibilité SSH,
+Préalables à vérifier sur la machine cible avant d'écrire quoi que ce soit : accessibilité SSH,
 OS et architecture, services déjà en place (ports en écoute, reverse proxy), espace disque
-et RAM disponibles. Aucun service existant ne doit être écrasé.
+et RAM disponibles. Aucun service existant ne doit être écrasé. Sur la recette, ces contrôles
+ont été faits avant installation ; ils sont reconduits à chaque déploiement.
 
 ## 9. Ce qui ne doit jamais être déployé
 
