@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-white text-zinc-900 antialiased;
+  }
+
+  ::selection {
+    @apply bg-indigo-600/15 text-zinc-900;
+  }
+}
+
+@layer utilities {
+  /* Grille de points discrète, utilisée en fond de hero */
+  .bg-dot-grid {
+    background-image: radial-gradient(circle at 1px 1px, rgb(24 24 27 / 0.09) 1px, transparent 0);
+    background-size: 22px 22px;
+  }
+}
