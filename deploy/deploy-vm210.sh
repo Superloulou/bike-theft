@@ -33,7 +33,7 @@ scp "${SSH_OPTS[@]}" "$TARBALL" "$VM_USER@$VM_HOST:/tmp/$(basename "$TARBALL")"
 echo "==> Provisionnement (idempotent)"
 REMOTE_TARBALL="/tmp/$(basename "$TARBALL")"
 ssh "${SSH_OPTS[@]}" "$VM_USER@$VM_HOST" \
-  "sudo -n RUN_TARBALL=$REMOTE_TARBALL APP_DIR=$APP_DIR HEALTH_PORT=$HEALTH_PORT bash -l" \
+  "sudo -n RUN_TARBALL=$REMOTE_TARBALL APP_DIR=$APP_DIR PORT=$HEALTH_PORT HEALTH_PORT=$HEALTH_PORT HOSTNAME_BIND=0.0.0.0 bash -l" \
   < deploy/provision-vm.sh \
   || { echo "ERREUR : le provisionnement a échoué"; exit 1; }
 

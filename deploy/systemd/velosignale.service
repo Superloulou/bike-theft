@@ -15,9 +15,11 @@ Type=simple
 User=velosignale
 Group=velosignale
 WorkingDirectory=/opt/velosignale/current/app
-EnvironmentFile=-/opt/velosignale/shared/env
+# Valeurs par défaut, surchargeables par le fichier de configuration.
 Environment=PORT=3100
 Environment=HOSTNAME=0.0.0.0
+Environment=NODE_ENV=production
+EnvironmentFile=-/opt/velosignale/shared/env
 ExecStart=/usr/local/bin/node /opt/velosignale/current/app/server.js
 Restart=always
 RestartSec=3

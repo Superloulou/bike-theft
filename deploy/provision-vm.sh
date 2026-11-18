@@ -49,8 +49,14 @@ if [ -n "$RUN_TARBALL" ] && [ -f "$RUN_TARBALL" ]; then
   tar -xzf "$RUN_TARBALL" -C "$APP_DIR/releases/$STAMP"
   # configuration : on ne l'écrase pas si elle existe déjà
   if [ ! -f "$APP_DIR/shared/env" ]; then
-    cp "$APP_DIR/releases/$STAMP/config/env.example" "$APP_DIR/shared/env"
-    echo "==> Configuration créée : $APP_DIR/shared/env"
+    # le port d'écoute est celui choisi par le déploiement, pas celui du dev local
+    {
+      echo "PORT=${PORT:-3100}"
+      echo "HOSTNAME=${HOSTNAME_BIND:-0.0.0.0}"
+      echo "NODE_ENV=production"
+      echo "DATABASE_FILE=$APP_DIR/data/reports.db"
+    } > "$APP_DIR/shared/env"
+    echo "==> Configuration créée : $APP_DIR/shared/env (port ${PORT:-3100})"
   fi
   ln -sfn "$APP_DIR/releases/$STAMP" "$APP_DIR/current"
   chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR"
