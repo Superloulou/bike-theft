@@ -150,11 +150,22 @@ n'est à récupérer.
 
 ## 7. Nom de domaine
 
-Le vhost Apache est déjà prêt (`ServerAlias volvelo.neuvytech.fr`). La création de
-l'enregistrement DNS chez IONOS et la mise en place d'un certificat (HTTPS) restent à la main
-de l'exploitant : elles nécessitent une clé API valide et une exposition publique explicite,
-et ne sont pas faites par ce projet. En l'état, la production n'est joignable que depuis le
-réseau local.
+Le vhost Apache est déjà prêt (`ServerAlias volvelo.neuvytech.fr`). La création des noms de
+domaine et la mise en place d'un certificat (HTTPS) restent à la main de l'exploitant : elles
+nécessitent des identifiants valides et une exposition publique explicite, et ne sont pas
+faites par ce projet. En l'état, la production n'est joignable que par adresse, sur le réseau
+local (`http://192.168.50.63/`).
+
+État constaté côté DNS :
+
+- `neuvytech.fr` (IONOS) porte déjà un joker `*` en A vers l'IP publique de la box. Créer
+  `volvelo.neuvytech.fr` renverrait donc soit sur cette IP, soit sur une IP publique qu'il
+  faut décider volontairement : la VM de production n'a qu'une adresse privée (`192.168.50.63`)
+  et n'est pas exposée sur Internet. Il faut d'abord trancher entre une publication
+  (forward DNS + redirection de port + certificat) et un simple enregistrement interne.
+- `home.local` est bien une zone hébergée par le paquet « DNS Server » du NAS Synology
+  (`192.168.50.22`, joint par les postes du réseau). L'enregistrement
+  `volvelo-recette.home.local` peut y être ajouté depuis l'interface de DSM, à la main.
 
 ## 8. Ce qui ne doit jamais être déployé
 
