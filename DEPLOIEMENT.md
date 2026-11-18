@@ -156,16 +156,25 @@ nécessitent des identifiants valides et une exposition publique explicite, et n
 faites par ce projet. En l'état, la production n'est joignable que par adresse, sur le réseau
 local (`http://192.168.50.63/`).
 
-État constaté côté DNS :
+État constaté côté DNS (mesures du 18/11/2026) :
 
-- `neuvytech.fr` (IONOS) porte déjà un joker `*` en A vers l'IP publique de la box. Créer
-  `volvelo.neuvytech.fr` renverrait donc soit sur cette IP, soit sur une IP publique qu'il
-  faut décider volontairement : la VM de production n'a qu'une adresse privée (`192.168.50.63`)
-  et n'est pas exposée sur Internet. Il faut d'abord trancher entre une publication
-  (forward DNS + redirection de port + certificat) et un simple enregistrement interne.
-- `home.local` est bien une zone hébergée par le paquet « DNS Server » du NAS Synology
-  (`192.168.50.22`, joint par les postes du réseau). L'enregistrement
-  `volvelo-recette.home.local` peut y être ajouté depuis l'interface de DSM, à la main.
+- **Le joker `*` de `neuvytech.fr` (IONOS) couvre déjà `volvelo.neuvytech.fr`** : aucune
+  création d'enregistrement A n'est nécessaire pour que le nom résolve. Il pointe vers
+  l'IP publique de la box (`82.65.196.90`), où nginx répond sur 80 (redirection 301) et
+  sert **Home Assistant** sur 443. Le nom résout donc, mais vers le mauvais service :
+  tant que la VM de production n'est pas exposée (forward DNS sur la box, certificat,
+  `ServerAlias` déjà en place), `https://volvelo.neuvytech.fr` atterrit sur Home Assistant.
+- **Sur le réseau local, ce joker est invisible** : le NAS Synology est **autoritaire**
+  sur `neuvytech.fr` (zone « DNS Server », SOA `ns.neuvytech.fr` série 2, vide) et les
+  postes du réseau l'utilisent comme resolver (`192.168.1.22`). `volvelo.neuvytech.fr`
+  y renvoie NXDOMAIN. C'est donc **sur le Synology** qu'il faut ajouter l'enregistrement
+  A `volvelo` → `192.168.50.63` pour un accès depuis la maison, et non chez IONOS.
+- `home.local` est la même zone du paquet « DNS Server » : l'enregistrement
+  `volvelo-recette.home.local` s'y ajoute de la même façon depuis DSM.
+
+Dans les deux cas il manque un compte DSM valide pour piloter le paquet « DNS Server »
+(l'API `SYNO.API.Auth` refuse le compte transmis). L'ajout se fait sinon en trois clics
+dans DSM → DNS Server → Zone `neuvytech.fr` / `home.local` → Créer un A.
 
 ## 8. Ce qui ne doit jamais être déployé
 
