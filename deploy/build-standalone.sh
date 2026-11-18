@@ -43,4 +43,4 @@ echo
 echo "Paquet : $TARBALL"
 ls -lh "$TARBALL"
 echo
-echo "Ensuite : bash deploy/deploy-vm210.sh"
+echo "Ensuite : bash deploy/deploy-prod.sh"

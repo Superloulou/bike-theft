@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Prépare la VM de recette (VM 210) pour Vélo Signalé.
+# Prépare la VM de production (VMID 211) pour Vélo Signalé.
 # Ce script est exécuté À DISTANCE, pipé par ssh sur un shell root :
 #   ssh muret@192.168.50.60 'sudo -n bash -l' < deploy/provision-vm.sh
 # Il est idempotent : relançable sans écraser ce qui existe déjà.
@@ -44,6 +44,11 @@ mkdir -p "$APP_DIR/releases" "$APP_DIR/shared" "$APP_DIR/data" "$APP_DIR/logs"
 # ---------------------------------------------------------------- déploiement du paquet
 if [ -n "$RUN_TARBALL" ] && [ -f "$RUN_TARBALL" ]; then
   STAMP="$(basename "$RUN_TARBALL" .tar.gz)"
+  # Un paquet tronqué passe « scp » sans erreur : on valide l'archive avant d'en toucher.
+  if ! gzip -t "$RUN_TARBALL" >/dev/null 2>&1; then
+    echo "ERREUR : $RUN_TARBALL est une archive gzip invalide (transfert corrompu)."
+    exit 1
+  fi
   echo "==> Déploiement de la version $STAMP"
   mkdir -p "$APP_DIR/releases/$STAMP"
   tar -xzf "$RUN_TARBALL" -C "$APP_DIR/releases/$STAMP"

@@ -3,71 +3,76 @@
 Document de maintenance : comment compiler, publier, déployer, vérifier et revenir en
 arrière. La maquette n'enregistre aucune donnée : redéployer ne risque aucune perte.
 
+**Une seule machine : la production (VMID 211).** Il n'y a plus d'environnement de recette ;
+l'installation qui avait été tentée sur la VM 101 a été retirée.
+
 ## 1. Architecture retenue
 
 | Élément | Choix | Pourquoi |
 | --- | --- | --- |
-| Format livré | Build Next.js **`output: "standalone"`** archivé en `.tar.gz` | La VM de recette n'a ni compilateur, ni Docker, que ~1,4 Go de disque libre et 967 Mo de RAM sans swap : `npm ci` + `next build` sur place est impossible |
+| Format livré | Build Next.js **`output: "standalone"`** archivé en `.tar.gz` | La VM n'a ni compilateur ni Docker, ~1,1 Go de disque libre et 967 Mo de RAM sans swap : `npm ci` + `next build` sur place est impossible |
 | Runtime | Node.js 22 LTS binaire officiel installé dans `/usr/local` | `better-sqlite3` n'est pas embarqué dans le bundle standalone (le back-end qui l'importait n'est référencé par aucune page), donc aucun module natif à compiler |
 | Lancement | Unité systemd `velosignale.service`, `Restart=always` | Redémarrage automatique, logs dans `journalctl` |
 | Configuration | `/opt/velosignale/shared/env` (lu via `EnvironmentFile`) | Les valeurs ne sont pas codées en dur ; modèle documenté dans `.env.example` |
 | Versionnage | `/opt/velosignale/releases/<horodatage>` + lien `current` | Retour arrière immédiat |
-| Port | `3100` en écoute | Le port 80 de la VM est déjà occupé par Apache (devant un reverse proxy BunkerWeb) : il n'est **pas** touché |
+| Ports | `3100` (application) et `80` (Apache, reverse proxy) | Apache est déjà présent sur l'image clonée ; il transmet à l'application au lieu de servir un autre site |
 
 > Le sujet demandait « une méthode reproductible (ex. Docker Compose) ». Docker n'est pas
-> installable sur la VM 210 dans ses conditions actuelles (aucun démon Docker, 1,4 Go de
-> disque libre, pas de compilateur pour les modules natifs, pas de swap). Le déploiement
+> installable sur la VM dans ses conditions actuelles (aucun démon Docker, ~1,1 Go de disque
+> libre, pas de compilateur pour les modules natifs, pas de swap). Le déploiement
 > systemd + archive standalone ci-dessous est l'équivalent reproductible retenu, avec les
-> mêmes garanties : configuration externalisée, redémarrage automatique, logs, test de
-> santé.
+> mêmes garanties : configuration externalisée, redémarrage automatique, logs, test de santé.
 
 ## 2. Environnement cible
 
 | VM | Rôle | Accès |
 | --- | --- | --- |
-| 210 | recette | `muret@192.168.50.60` (hôte `muret-recette`), Debian 13, `sudo` sans mot de passe |
-| 211 | production | **n'existe pas sur le cluster** — voir l'inventaire ci-dessous |
+| 211 `velosignale-prod` | **production** | `muret@192.168.50.63`, Debian 13 (trixie), `sudo` sans mot de passe, tag Proxmox `velosignale` |
 
-Contraintes mesurées sur la VM 210 : disque racine 2,8 Go (1,4 Go libres), 967 Mo de RAM,
-aucun swap, Apache déjà actif sur le port 80, aucun service Node.js.
+Contraintes mesurées sur la VM : disque racine 2,8 Go (1,1 Go libres après déploiement),
+967 Mo de RAM, aucun swap, Apache 2.4 actif sur le port 80.
 
-### Inventaire réel du cluster (relevé via l'API Proxmox du nœud `proxmox2`, PVE 9.2.2)
-
-Le numéro de machine attendu ne correspond pas au VMID réel : la machine de recette déclarée
-« VM 210 » est en réalité le **VMID 101**. Aucun VMID 211 n'est présent, et l'API renvoie
-`211` comme identifiant **libre** (`cluster/nextid`), ce qui confirme qu'aucune machine de
-production n'a encore été créée.
+### Inventaire du cluster (relevé via l'API Proxmox du nœud `proxmox2`, PVE 9.2.2)
 
 | VMID | Nom | IP | Rôle constaté |
 | --- | --- | --- | --- |
-| 100 | `villarceau` | `192.168.50.50` | site « Projet remplacement du muret de Villarceau » |
-| 101 | `muret-recette` | `192.168.50.60` | **recette Vélo Signalé** (déploiement en cours) |
+| 100 | `villarceau` | `192.168.50.50` | site « Projet remplacement du muret de Villarceau » — ne pas toucher |
+| 101 | `muret-recette` | `192.168.50.60` | image de base (clonée pour la production) ; l'installation Vélo Signalé y a été **retirée** |
 | 200 | `tor-gateway` | `192.168.50.61` | passerelle Tor — ne pas toucher |
 | 201 | `lbc-alertes` | `192.168.50.62` | alertes Leboncoin — ne pas toucher |
+| 211 | `velosignale-prod` | `192.168.50.63` | **production Vélo Signalé** |
 
-Autres hôtes joignables sur le réseau qui ne sont **pas** des VM du cluster : `192.168.50.56`
-(Home Assistant), `192.168.50.55` et `192.168.50.57` (SSH ouvert, aucune identité connue),
-`192.168.50.58` (le nœud Proxmox lui-même).
+Autres hôtes joignables qui ne sont **pas** des VM du cluster : `192.168.50.56`
+(Home Assistant), `192.168.50.55` et `192.168.50.57` (SSH ouvert, identité inconnue),
+`192.168.50.22` (NAS Synology), `192.168.50.58` (le nœud Proxmox lui-même).
 
-Conséquence : la production ne peut pas être déployée tant que la machine n'existe pas. Deux
-options, à trancher par l'exploitant — créer la VM 211 (le token d'automatisation dispose des
-droits `VM.Allocate`/`VM.Clone`), ou désigner une VM existante. Le déploiement n'est pas
-lancé à l'aveugle.
+### Stockage : ne pas utiliser `local-lvm`
 
-### État de la recette (déployé)
+La VM 211 a été reconstruite après une panne matérielle, et le diagnostic a désigné le pool
+**`local-lvm`** (LVM-Thin, 5,84 To, jusqu'ici jamais utilisé) comme responsable : un clone
+intègre de la VM 101 y démarrait sans jamais écrire un octet (statistiques de bloc figées,
+agent inactive), alors que le même disque redémarre normalement dès qu'il est replacé sur
+**`ssd-vm`**. Tant que le pool n'est pas vérifié, les VM doivent rester sur `ssd-vm`
+(`scsi0 = ssd-vm:vm-211-disk-0`).
 
-| Élément | Valeur relevée sur la VM |
+Conséquence pratique après un changement de disque : l'empreinte SSH de `192.168.50.63` a
+changé, il faut `ssh-keygen -R 192.168.50.63` avant le premier accès.
+
+### État de la production (relevé sur la VM)
+
+| Élément | Valeur |
 | --- | --- |
-| Service | `velosignale.service`, `active`, `enabled` (démarré au boot), `Restart=always` |
-| Écoute | `0.0.0.0:3100` — le port 80 d'Apache n'est pas touché |
-| Node.js | v22.14.0 installé dans `/usr/local` (115 Mo) |
-| Application | `/opt/velosignale/current` → `releases/velosignale-<horodatage>` (76 Mo pour deux versions) |
+| Service | `velosignale.service`, `active`, `enabled`, `Restart=always` |
+| Écoute | `0.0.0.0:3100` (application) et `0.0.0.0:80` (Apache) |
+| Apache | `sites-enabled/velosignale.conf` : `ServerName velosignale-prod`, `ServerAlias volvelo.neuvytech.fr`, `ProxyPass / http://127.0.0.1:3100/` ; modules `proxy`, `proxy_http`, `headers` ; l'ancien vhost hérité `muret-villarceau.conf` est désactivé |
+| Node.js | v22.14.0 dans `/usr/local` |
+| Application | `/opt/velosignale/current` → `releases/velosignale-<horodatage>` (3 versions conservées) |
 | Utilisateur | `velosignale` (système, sans shell de connexion) |
 | Données | `/opt/velosignale/data` — vide, la maquette n'écrit rien |
 | Mémoire du service | ~40 Mo |
-| Redémarrage automatique | vérifié : le processus tué est réapprovisionné par systemd en quelques secondes et le test de santé repasse à 200 |
+| Redémarrage automatique | vérifié : le processus tué est réapprovisionné par systemd et le test de santé repasse à 200 |
 
-Accès de vérification : `http://192.168.50.60:3100/`.
+Accès : `http://192.168.50.63/` (via Apache) ou `http://192.168.50.63:3100/` (direct).
 
 ## 3. Déroulé d'une mise à jour
 
@@ -78,24 +83,34 @@ npm run lint
 npm run build
 bash deploy/build-standalone.sh      # -> dist/velosignale-<horodatage>.tar.gz
 
-# 2. Déployer sur la VM de recette
-bash deploy/deploy-vm210.sh
+# 2. Déployer sur la VM de production
+bash deploy/deploy-prod.sh
 ```
 
-Le script de déploiement transfère l'archive par SSH puis applique
-`deploy/provision-vm.sh` (idempotent) : installation de Node si absent, création de
-l'utilisateur système `velosignale`, extraction dans `releases/`, bascule du lien
-`current`, installation et redémarrage de l'unité systemd, test de santé local.
+Le script de déploiement transfère l'archive par SSH **en contrôlant l'empreinte sha256 des
+deux côtés** (le lien vers les VM produit parfois des fichiers tronqués acceptés sans erreur
+par `scp`) ; en cas d'échec il redécoupe le paquet en morceaux vérifiés un par un. Il applique
+ensuite `deploy/provision-vm.sh` (idempotent) : installation de Node si absent, création de
+l'utilisateur système `velosignale`, extraction dans `releases/`, bascule du lien `current`,
+installation et redémarrage de l'unité systemd, test de santé local.
+
+Sans Git Bash sur le poste, les deux étapes se font en PowerShell :
+
+```powershell
+scp dist\velosignale-<horodatage>.tar.gz muret@192.168.50.63:/tmp/
+$s = (Get-Content deploy\provision-vm.sh -Raw) -replace "`r",""
+$s | ssh muret@192.168.50.63 'sudo -n RUN_TARBALL=/tmp/velosignale-<horodatage>.tar.gz APP_DIR=/opt/velosignale PORT=3100 HEALTH_PORT=3100 HOSTNAME_BIND=0.0.0.0 bash -l'
+```
 
 ## 4. Vérifications après déploiement
 
 ```bash
 # depuis le poste de développement
-curl -i http://192.168.50.60:3100/                 # 200, bannière de démonstration
-curl -i http://192.168.50.60:3100/declarer         # 200, formulaire 4 étapes
-curl -i http://192.168.50.60:3100/dossier/VS-DEMO-2401   # 200, dossier d'exemple
-curl -i http://192.168.50.60:3100/dossier/INVALID-1      # 404
-curl -i -X POST http://192.168.50.60:3100/api/reports    # 410, aucune donnée enregistrée
+curl -i http://192.168.50.63/                        # 200 (Apache -> application)
+curl -i http://192.168.50.63:3100/declarer           # 200, formulaire 4 étapes
+curl -i http://192.168.50.63:3100/dossier/VS-DEMO-2401   # 200, dossier d'exemple
+curl -i http://192.168.50.63:3100/dossier/INVALID-1      # 404
+curl -i -X POST http://192.168.50.63:3100/api/reports    # 410, aucune donnée enregistrée
 ```
 
 Depuis la VM :
@@ -104,6 +119,7 @@ Depuis la VM :
 sudo systemctl status velosignale
 sudo journalctl -u velosignale -n 50 --no-pager
 curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3100/
+sudo apache2ctl configtest && sudo systemctl status apache2
 ```
 
 ## 5. Configuration
@@ -128,36 +144,22 @@ ln -sfn /opt/velosignale/releases/<nom> /opt/velosignale/current
 sudo systemctl restart velosignale
 ```
 
-Les 3 versions les plus récentes sont conservées automatiquement.
+Les 3 versions les plus récentes sont conservées automatiquement. En dernier recours, la VM
+peut être reconstruite par clonage complet de la VM 101 puis redéploiement : aucune donnée
+n'est à récupérer.
 
-## 7. Exposition au navigateur
+## 7. Nom de domaine
 
-Le service écoute sur le port 3100 de la VM. Pour un accès public, l'exploitant doit
-côté reverse proxy existant (BunkerWeb/Apache) ajouter une règle de transmission vers
-`192.168.50.60:3100`, plus un certificat. **Ces modifications ne sont pas faites par ce
-projet** : elles nécessitent une validation explicite.
+Le vhost Apache est déjà prêt (`ServerAlias volvelo.neuvytech.fr`). La création de
+l'enregistrement DNS chez IONOS et la mise en place d'un certificat (HTTPS) restent à la main
+de l'exploitant : elles nécessitent une clé API valide et une exposition publique explicite,
+et ne sont pas faites par ce projet. En l'état, la production n'est joignable que depuis le
+réseau local.
 
-## 8. Passer en production (VM 211)
-
-**Aucune VM de production n'existe à ce jour** (voir l'inventaire de la section 2 : le VMID 211
-est libre, les seules machines du cluster sont les VMID 100, 101, 200 et 201). Cette étape est
-donc en attente, et elle n'est pas exécutée sans accord explicite de l'exploitant.
-
-Une fois la machine cible créée (ou une VM existante désignée), le script de recette sert tel
-quel, il suffit de changer la cible :
-
-```bash
-VM_HOST=<ip-de-la-vm-de-production> VM_USER=<utilisateur> bash deploy/deploy-vm210.sh
-```
-
-Préalables à vérifier sur la machine cible avant d'écrire quoi que ce soit : accessibilité SSH,
-OS et architecture, services déjà en place (ports en écoute, reverse proxy), espace disque
-et RAM disponibles. Aucun service existant ne doit être écrasé. Sur la recette, ces contrôles
-ont été faits avant installation ; ils sont reconduits à chaque déploiement.
-
-## 9. Ce qui ne doit jamais être déployé
+## 8. Ce qui ne doit jamais être déployé
 
 - Aucune donnée personnelle : la maquette n'enregistre rien, le dossier `data/` reste vide.
 - Aucun fichier `.env` réel dans le dépôt (ignoré par `.gitignore`, seul `.env.example` est
   publié).
+- Aucun identifiant, jeton ou clé API dans le dépôt ou l'historique Git.
 - Aucun `git push --force`.

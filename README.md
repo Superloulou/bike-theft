@@ -54,12 +54,13 @@ Modèle dans [.env.example](./.env.example) : `PORT`, `HOSTNAME`, `NODE_ENV`,
 
 ## Déploiement
 
-Procédure complète — compilation, publication, mise à jour de la VM de recette,
-vérifications, retour arrière — dans [DEPLOIEMENT.md](./DEPLOIEMENT.md).
+Procédure complète — compilation, publication, mise à jour de la VM de production
+(VMID 211, `192.168.50.63`), vérifications, retour arrière — dans
+[DEPLOIEMENT.md](./DEPLOIEMENT.md).
 
 ```bash
 bash deploy/build-standalone.sh    # paquet déployable dans dist/
-bash deploy/deploy-vm210.sh        # déploiement sur la VM de recette
+bash deploy/deploy-prod.sh         # déploiement sur la VM de production
 ```
 
 ## Licence
