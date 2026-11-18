@@ -148,34 +148,70 @@ Les 3 versions les plus récentes sont conservées automatiquement. En dernier r
 peut être reconstruite par clonage complet de la VM 101 puis redéploiement : aucune donnée
 n'est à récupérer.
 
-## 7. Nom de domaine
+## 7. Nom de domaine et reverse proxy frontal
 
-Le vhost Apache est déjà prêt (`ServerAlias volvelo.neuvytech.fr`). La création des noms de
-domaine et la mise en place d'un certificat (HTTPS) restent à la main de l'exploitant : elles
-nécessitent des identifiants valides et une exposition publique explicite, et ne sont pas
-faites par ce projet. En l'état, la production n'est joignable que par adresse, sur le réseau
-local (`http://192.168.50.63/`).
+La production est exposée publiquement par `https://volvelo.neuvytech.fr`. Le chemin complet :
 
-État constaté côté DNS (mesures du 18/11/2026) :
+```
+Internet → volvelo.neuvytech.fr (DNS IONOS, joker * → IP publique de la box)
+  → VM PROXY 192.168.50.56 : nginx 80 (301) / 443 (TLS Let's Encrypt, certbot)
+      → X-Forwarded-For / X-Forwarded-Proto → VM 211 192.168.50.63 : Apache 80
+          → ProxyPass → Next.js 127.0.0.1:3100
+```
 
-- **Le joker `*` de `neuvytech.fr` (IONOS) couvre déjà `volvelo.neuvytech.fr`** : aucune
-  création d'enregistrement A n'est nécessaire pour que le nom résolve. Il pointe vers
-  l'IP publique de la box (celle que renvoie déjà le domaine racine), où nginx répond sur
-  80 (redirection 301) et sert un autre service sur 443. Le nom résout donc, mais vers le
-  mauvais service :
-  tant que la VM de production n'est pas exposée (forward DNS sur la box, certificat,
-  `ServerAlias` déjà en place), `https://volvelo.neuvytech.fr` atterrit sur Home Assistant.
+### 7.1 Vhost nginx (VM proxy `192.168.50.56`)
+
+Fichier `/etc/nginx/sites-available/volvelo.neuvytech.fr.conf` (activé par lien dans
+`sites-enabled/`), même modèle que le vhost `vote.neuvytech.fr` déjà en place :
+
+- `upstream velosignale_prod { server 192.168.50.63:80; keepalive 8; }` — on vise l'Apache de
+  la VM, pas le port 3100 : l'Apache porte le `ServerAlias` et journalise déjà.
+- `proxy_set_header Host $host` — indispensable, l'Apache de la VM fait `ProxyPreserveHost On`.
+- `X-Real-IP`, `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Forwarded-Host` — le rate-limiting de
+  l'application (`src/lib/rate-limit.ts`, fonction `clientKey`) lit le premier élément de
+  `X-Forwarded-For` ; sans ces en-têtes tous les visiteurs partageraient le même compteur.
+- `Upgrade` / `Connection $connection_upgrade` — la `map` est déjà fournie par
+  `/etc/nginx/conf.d/websocket-map.conf`.
+- `client_max_body_size 5m`, journaux dédiés `/var/log/nginx/volvelo.neuvytech.fr.*.log`.
+- Le bloc 443 et la redirection 301 sont gérés par certbot (les lignes `# managed by Certbot`).
+
+Modification : éditer le fichier, puis `sudo nginx -t && sudo systemctl reload nginx`.
+
+### 7.2 Certificat
+
+Délivré par certbot (`--nginx`, challenge HTTP ACME servi par le vhost, racine
+`/var/www/html`) : `/etc/letsencrypt/live/volvelo.neuvytech.fr/`, SAN
+`volvelo.neuvytech.fr`, TLS 1.3, renouvellement automatique planifié. Aucune action manuelle
+n'est requise ; `sudo certbot certificates` pour l'état.
+
+### 7.3 Résolution locale (à faire)
+
+- **Publiquement, aucune création d'enregistrement n'est nécessaire** : le joker `*` de
+  `neuvytech.fr` (IONOS) couvre déjà `volvelo.neuvytech.fr` et pointe vers l'IP publique de la
+  box, où nginx sélectionne désormais le bon vhost par SNI.
 - **Sur le réseau local, ce joker est invisible** : le NAS Synology est **autoritaire**
-  sur `neuvytech.fr` (zone « DNS Server », SOA `ns.neuvytech.fr` série 2, vide) et les
-  postes du réseau l'utilisent comme resolver (`192.168.1.22`). `volvelo.neuvytech.fr`
-  y renvoie NXDOMAIN. C'est donc **sur le Synology** qu'il faut ajouter l'enregistrement
-  A `volvelo` → `192.168.50.63` pour un accès depuis la maison, et non chez IONOS.
+  sur `neuvytech.fr` (zone « DNS Server », SOA `ns.neuvytech.fr` série 2, vide) et les postes
+  du réseau l'utilisent comme resolver (`192.168.1.22`). `volvelo.neuvytech.fr` y renvoie
+  NXDOMAIN. C'est donc **sur le Synology** qu'il faut ajouter l'enregistrement
+  A `volvelo` → `192.168.50.63` pour un accès direct depuis la maison, et non chez IONOS.
 - `home.local` est la même zone du paquet « DNS Server » : l'enregistrement
   `volvelo-recette.home.local` s'y ajoute de la même façon depuis DSM.
 
 Dans les deux cas il manque un compte DSM valide pour piloter le paquet « DNS Server »
 (l'API `SYNO.API.Auth` refuse le compte transmis). L'ajout se fait sinon en trois clics
 dans DSM → DNS Server → Zone `neuvytech.fr` / `home.local` → Créer un A.
+
+### 7.4 Vérification
+
+Depuis un poste du réseau (la résolution locale étant cassée, on épingle l'IP publique) :
+
+```powershell
+$ip = "<IP publique de la box>"
+curl.exe -s -o NUL -w "code=%{http_code}`n" --resolve "volvelo.neuvytech.fr:443:$ip" https://volvelo.neuvytech.fr/
+```
+
+Attendu : `200`, en-tête `Server: nginx`, titre « Vélo Signalé — Déclarez le vol de votre vélo ».
+En accès direct (hors proxy) : `http://192.168.50.63/`.
 
 ## 8. Ce qui ne doit jamais être déployé
 

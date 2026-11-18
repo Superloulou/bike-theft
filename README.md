@@ -54,8 +54,11 @@ Modèle dans [.env.example](./.env.example) : `PORT`, `HOSTNAME`, `NODE_ENV`,
 
 ## Déploiement
 
+En ligne : **<https://volvelo.neuvytech.fr>** (nginx frontal sur la VM proxy, puis Apache de
+la VM de production).
+
 Procédure complète — compilation, publication, mise à jour de la VM de production
-(VMID 211, `192.168.50.63`), vérifications, retour arrière — dans
+(VMID 211, `192.168.50.63`), reverse proxy et certificat, vérifications, retour arrière — dans
 [DEPLOIEMENT.md](./DEPLOIEMENT.md).
 
 ```bash
