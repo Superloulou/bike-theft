@@ -1,0 +1,35 @@
+# Unité systemd pour Vélo Signalé (maquette Next.js, sortie standalone).
+# Installée par deploy/provision-vm.sh dans /etc/systemd/system/.
+#
+# La configuration (PORT, HOSTNAME, NODE_ENV, DATABASE_FILE) est lue dans
+# /opt/velosignale/shared/env : modifier ce fichier puis
+#   sudo systemctl restart velosignale
+
+[Unit]
+Description=Velo Signale (maquette Next.js)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=velosignale
+Group=velosignale
+WorkingDirectory=/opt/velosignale/current/app
+EnvironmentFile=-/opt/velosignale/shared/env
+Environment=PORT=3100
+Environment=HOSTNAME=0.0.0.0
+ExecStart=/usr/local/bin/node /opt/velosignale/current/app/server.js
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+# Durcissement
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/velosignale/data
+
+[Install]
+WantedBy=multi-user.target
